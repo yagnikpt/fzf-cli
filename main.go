@@ -1,0 +1,159 @@
+/*
+Copyright © 2024 Yagnik Patel <pyagnik409@gmail.com>
+*/
+package main
+
+// import "github.com/yagnik-patel-47/fzf/cmd"
+import (
+	"fmt"
+	"log"
+	"os"
+	"strings"
+
+	"github.com/charmbracelet/bubbles/textinput"
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
+
+	"github.com/yagnik-patel-47/fzf/algo"
+	"github.com/yagnik-patel-47/fzf/files"
+	ui_list "github.com/yagnik-patel-47/fzf/ui/list"
+)
+
+type (
+	errMsg error
+)
+
+var docStyle = lipgloss.NewStyle().Margin(1, 2)
+var modeLabelStyle = lipgloss.NewStyle().Bold(true).Margin(0, 1, 0, 0).Padding(0, 1).Foreground(lipgloss.Color("#18181b")).Background(lipgloss.Color("#5eead4"))
+
+type model struct {
+	textInput textinput.Model
+	list      ui_list.Model
+	err       errMsg
+	mode      string
+}
+
+func main() {
+	f, err := tea.LogToFile("debug.log", "debug")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer f.Close()
+	m, err := initializeModel()
+	if err != nil {
+		fmt.Print(err.Error())
+	}
+	p := tea.NewProgram(m, tea.WithAltScreen())
+	if _, err := p.Run(); err != nil {
+		fmt.Printf("Alas, there's been an error: %v", err)
+		os.Exit(1)
+	}
+}
+
+func (m model) Init() tea.Cmd {
+	return textinput.Blink
+}
+
+func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmds []tea.Cmd
+	var cmd tea.Cmd
+
+	// log.Printf("Received message type: %T", msg)
+
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch msg.Type {
+		case tea.KeyCtrlC:
+			return m, tea.Quit
+		case tea.KeyEsc:
+			if m.mode == "normal" {
+				return m, tea.Quit
+			} else {
+				m.mode = "normal"
+				m.textInput.Blur()
+				return m, nil
+			}
+		}
+
+		switch msg.String() {
+		case "i":
+			if m.mode != "insert" {
+				m.mode = "insert"
+				m.textInput.Focus()
+				return m, nil
+			}
+		}
+
+	case errMsg:
+		m.err = msg
+		return m, nil
+
+	case tea.BlurMsg:
+		m.textInput.Cursor.Blink = false
+		log.Println("Blur event received")
+
+	case tea.FocusMsg:
+		m.textInput.Cursor.Blink = true
+		log.Println("Focus event received")
+
+		// case tea.WindowSizeMsg:
+		// 	h, v := docStyle.GetFrameSize()
+		// 	m.list.SetSize(msg.Width-h, msg.Height-v)
+	}
+
+	filteredValues := algo.FuzzyFind(m.textInput.Value(), m.list.GetConstItemValues())
+	m.list.SetItemValues(filteredValues)
+	m.list.UpdatePagesCount(len(filteredValues))
+
+	m.textInput, cmd = m.textInput.Update(msg)
+	cmds = append(cmds, cmd)
+	m.list, cmd = m.list.Update(msg)
+	cmds = append(cmds, cmd)
+	return m, tea.Batch(cmds...)
+}
+
+func (m model) View() string {
+	items := m.list.GetSlicedItems()
+
+	var b strings.Builder
+
+	b.WriteString(m.list.View() + "\n\n" + m.textInput.View() + "\n\n")
+	b.WriteString(modeLabelStyle.Render(fmt.Sprint(strings.ToUpper(m.mode))))
+
+	if m.mode == "insert" {
+		b.WriteString(fmt.Sprintf("%s\n", map[bool]string{true: "• enter: open • esc: normal mode", false: "esc: normal mode"}[len(items) > 0]))
+	} else {
+		b.WriteString(fmt.Sprintf("%s\n", map[bool]string{true: "• ←h/↑j/↓k/→l navigate • enter: open • esc: quit • i: insert mode", false: "esc: quit • i: insert mode"}[len(items) > 0]))
+	}
+
+	return docStyle.Render(b.String())
+}
+
+func initializeModel() (model, error) {
+	ti := textinput.New()
+	ti.Placeholder = "Search your stuff..."
+	ti.Focus()
+	ti.CharLimit = 156
+	ti.Width = 40
+
+	wd, err := os.Getwd()
+	if err != nil {
+		return model{}, err
+	}
+	file_items, err := files.GetAllFiles(wd)
+	if err != nil {
+		return model{}, err
+	}
+
+	const_items := make([]string, len(file_items))
+	copy(const_items, file_items)
+
+	m := model{
+		textInput: ti,
+		list:      ui_list.NewList(file_items, const_items),
+		err:       nil,
+		mode:      "insert",
+	}
+
+	return m, nil
+}
