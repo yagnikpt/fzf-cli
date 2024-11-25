@@ -4,7 +4,32 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 )
+
+var ignoredPaths = []string{
+	"node_modules",
+	".git",
+	"dist",
+	"build",
+	".next",
+	"target",
+	"bin",
+	"obj",
+	"vendor",
+	".idea",
+	".vscode",
+	"__pycache__",
+}
+
+func shouldSkip(path string) bool {
+	for _, ignored := range ignoredPaths {
+		if strings.Contains(path, ignored) {
+			return true
+		}
+	}
+	return false
+}
 
 func GetAllFiles(root string) ([]string, error) {
 	var files []string
@@ -14,12 +39,10 @@ func GetAllFiles(root string) ([]string, error) {
 			return err
 		}
 
-		// Skip if it's a directory
-		if info.IsDir() {
+		if shouldSkip(path) || info.IsDir() {
 			return nil
 		}
 
-		// Convert to relative path for files only
 		relPath, err := filepath.Rel(root, path)
 		if err != nil {
 			return err
@@ -30,6 +53,5 @@ func GetAllFiles(root string) ([]string, error) {
 	})
 
 	sort.Strings(files)
-
 	return files, err
 }

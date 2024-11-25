@@ -70,6 +70,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, tea.Quit
 			} else {
 				m.mode = "normal"
+				m.list.SetMode("normal")
 				m.textInput.Blur()
 				return m, nil
 			}
@@ -79,6 +80,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "i":
 			if m.mode != "insert" {
 				m.mode = "insert"
+				m.list.SetMode("insert")
+				m.textInput.Cursor.Blink = true
 				m.textInput.Focus()
 				return m, nil
 			}
@@ -109,6 +112,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	cmds = append(cmds, cmd)
 	m.list, cmd = m.list.Update(msg)
 	cmds = append(cmds, cmd)
+
 	return m, tea.Batch(cmds...)
 }
 
@@ -121,9 +125,9 @@ func (m model) View() string {
 	b.WriteString(modeLabelStyle.Render(fmt.Sprint(strings.ToUpper(m.mode))))
 
 	if m.mode == "insert" {
-		b.WriteString(fmt.Sprintf("%s\n", map[bool]string{true: "• enter: open • esc: normal mode", false: "esc: normal mode"}[len(items) > 0]))
+		b.WriteString(fmt.Sprintf("%s\n", map[bool]string{true: "↓s|w↑ • esc: normal mode", false: "esc: normal mode"}[len(items) > 0]))
 	} else {
-		b.WriteString(fmt.Sprintf("%s\n", map[bool]string{true: "• ←h/↑j/↓k/→l navigate • enter: open • esc: quit • i: insert mode", false: "esc: quit • i: insert mode"}[len(items) > 0]))
+		b.WriteString(fmt.Sprintf("%s\n", map[bool]string{true: "←a|↓s|w↑|d→ • i: insert mode • esc: quit", false: "esc: quit"}[len(items) > 0]))
 	}
 
 	return docStyle.Render(b.String())
