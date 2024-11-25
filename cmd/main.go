@@ -14,8 +14,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/yagnik-patel-47/fzf/algo"
-	"github.com/yagnik-patel-47/fzf/files"
+	"github.com/yagnik-patel-47/fzf/pkg/algo"
+	"github.com/yagnik-patel-47/fzf/pkg/files"
 	ui_list "github.com/yagnik-patel-47/fzf/ui/list"
 )
 
