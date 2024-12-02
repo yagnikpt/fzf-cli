@@ -3,7 +3,6 @@ Copyright © 2024 Yagnik Patel <pyagnik409@gmail.com>
 */
 package main
 
-// import "github.com/yagnik-patel-47/fzf/cmd"
 import (
 	"fmt"
 	"log"
