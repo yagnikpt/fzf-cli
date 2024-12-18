@@ -1,7 +1,6 @@
 package files
 
 import (
-	"fmt"
 	"log"
 	"os"
 	"path/filepath"
@@ -30,6 +29,7 @@ var ignoredPaths = []string{
 	".github",
 	".wrangler",
 	".svelte-kit",
+	".pnpm-store",
 }
 
 func shouldSkip(path string) bool {
@@ -41,12 +41,13 @@ func shouldSkip(path string) bool {
 	return false
 }
 
-func traverseDir(dir string, fileChan chan<- string, wg *sync.WaitGroup, rootdir string) {
+func traverseDir(dir string, fileChan chan<- string, errorChan chan<- error, wg *sync.WaitGroup, rootdir string) {
 	defer wg.Done()
 
 	entries, err := os.ReadDir(dir)
 	if err != nil {
-		fmt.Printf("Error reading directory %s: %v\n", dir, err)
+		log.Printf("Error reading directory %s: %v\n", dir, err)
+		errorChan <- err
 		return
 	}
 
@@ -55,12 +56,12 @@ func traverseDir(dir string, fileChan chan<- string, wg *sync.WaitGroup, rootdir
 		if entry.IsDir() {
 			if !shouldSkip(entry.Name()) {
 				wg.Add(1)
-				go traverseDir(fullPath, fileChan, wg, rootdir)
+				go traverseDir(fullPath, fileChan, errorChan, wg, rootdir)
 			}
 		} else {
 			path, err := filepath.Rel(rootdir, fullPath)
 			if err != nil {
-				log.Fatalf("Error getting relative path for %s: %v\n", fullPath, err)
+				log.Printf("Error getting relative path for %s: %v\n", fullPath, err)
 				continue
 			}
 			fileChan <- path
@@ -71,7 +72,12 @@ func traverseDir(dir string, fileChan chan<- string, wg *sync.WaitGroup, rootdir
 func GetAllFiles(root string) ([]string, error) {
 	var files []string
 	fileChan := make(chan string)
+	errorChan := make(chan error)
 	var wg sync.WaitGroup
+
+	if _, err := os.Stat(root); os.IsNotExist(err) {
+		return nil, err
+	}
 
 	go func() {
 		for file := range fileChan {
@@ -79,11 +85,20 @@ func GetAllFiles(root string) ([]string, error) {
 		}
 	}()
 
+	go func() {
+		for err := range errorChan {
+			if err != nil {
+				log.Printf("Error occurred while traversing: %v\n", err)
+			}
+		}
+	}()
+
 	wg.Add(1)
-	go traverseDir(root, fileChan, &wg, root)
+	go traverseDir(root, fileChan, errorChan, &wg, root)
 
 	wg.Wait()
 	close(fileChan)
+	close(errorChan)
 
 	sort.Strings(files)
 	return files, nil

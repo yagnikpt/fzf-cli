@@ -1,6 +1,6 @@
 module github.com/yagnik-patel-47/fzf
 
-go 1.23.2
+go 1.23.4
 
 require (
 	github.com/charmbracelet/bubbles v0.20.0

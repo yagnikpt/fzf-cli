@@ -13,19 +13,22 @@ import (
 )
 
 type Model struct {
-	items       []string
-	const_items []string
-	cursor      int
-	paginator   paginator.Model
-	mode        string
+	Items       []string
+	ConstItems  []string
+	Cursor      int
+	Paginator   paginator.Model
+	Mode        string
+	FilterValue string
+	Dir         string
 }
 
-var headerStyle = lipgloss.NewStyle().Padding(1, 4).Foreground(lipgloss.Color("#FFFFFF")).Background(lipgloss.Color(("#4f46e5")))
-var itemStyle = lipgloss.NewStyle()
-var activeItemStyle = itemStyle.Background(lipgloss.Color("#f43f5e")).Foreground(lipgloss.Color("#fff")).Bold(true)
+var headerStyle = lipgloss.NewStyle().Padding(0, 1).Bold(true).Italic(true).Foreground(lipgloss.Color("#FFFFFF")).Background(lipgloss.Color(("#4f46e5")))
+var itemLengthStyle = lipgloss.NewStyle().Margin(1, 0).Foreground(lipgloss.Color("#5e5e5e"))
 var cursorStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#f43f5e")).Bold(true)
+var searchFilterBg = lipgloss.NewStyle().Background(lipgloss.Color("#f43f5e"))
+var listContainerStyle = lipgloss.NewStyle()
 
-func NewList(items []string, const_items []string) Model {
+func NewList(items []string, const_items []string, dir string) Model {
 	p := paginator.New()
 	p.Type = paginator.Dots
 	p.PerPage = 10
@@ -40,57 +43,52 @@ func NewList(items []string, const_items []string) Model {
 	p.KeyMap.PrevPage.SetEnabled(false)
 
 	return Model{
-		items:       items,
-		const_items: const_items,
-		cursor:      0,
-		paginator:   p,
-		mode:        "insert",
+		Items:       items,
+		ConstItems:  const_items,
+		Cursor:      0,
+		Paginator:   p,
+		Mode:        "insert",
+		FilterValue: "",
+		Dir:         dir,
 	}
 }
 
-func (l *Model) GetItemValues() []string {
-	return l.items
-}
-
-func (l *Model) GetConstItemValues() []string {
-	return l.const_items
-}
-
-func (l *Model) SetItemValues(values []string) {
-	l.items = values
+func (l *Model) SetListHeight(height int) {
+	l.Paginator.PerPage = height
+	listContainerStyle = listContainerStyle.Height(height)
 }
 
 func (l *Model) UpdatePagesCount(total int) {
-	if total == 0 || l.paginator.Page*l.paginator.PerPage >= total {
-		l.paginator.Page = 0
+	if total == 0 || l.Paginator.Page*l.Paginator.PerPage >= total {
+		l.Paginator.Page = 0
 	}
-	l.paginator.SetTotalPages(total)
+	l.Paginator.SetTotalPages(total)
 }
 
 func (l *Model) GetSlicedItems() []string {
-	if len(l.items) == 0 {
+	if len(l.Items) == 0 {
 		return []string{}
 	}
-	start, end := l.paginator.GetSliceBounds(len(l.items))
+	start, end := l.Paginator.GetSliceBounds(len(l.Items))
 	// Ensure bounds are valid
-	if start >= len(l.items) {
+	if start >= len(l.Items) {
 		start = 0
-		l.paginator.Page = 0
+		l.Paginator.Page = 0
 	}
-	if end > len(l.items) {
-		end = len(l.items)
+	if end > len(l.Items) {
+		end = len(l.Items)
 	}
-	return l.items[start:end]
+	return l.Items[start:end]
 }
 
 func (l *Model) SetMode(mode string) {
-	l.mode = mode
+	l.Mode = mode
 	if mode == "insert" {
-		l.paginator.KeyMap.NextPage.SetEnabled(false)
-		l.paginator.KeyMap.PrevPage.SetEnabled(false)
+		l.Paginator.KeyMap.NextPage.SetEnabled(false)
+		l.Paginator.KeyMap.PrevPage.SetEnabled(false)
 	} else {
-		l.paginator.KeyMap.NextPage.SetEnabled(true)
-		l.paginator.KeyMap.PrevPage.SetEnabled(true)
+		l.Paginator.KeyMap.NextPage.SetEnabled(true)
+		l.Paginator.KeyMap.PrevPage.SetEnabled(true)
 	}
 }
 
@@ -127,32 +125,32 @@ var listNavigation = KeyMap{
 func (l *Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	var cmd tea.Cmd
 
-	if len(l.items) == 0 {
-		l.cursor = 0
-		l.paginator.Page = 0
+	if len(l.Items) == 0 {
+		l.Cursor = 0
+		l.Paginator.Page = 0
 		return *l, cmd
 	}
 
-	l.paginator, cmd = l.paginator.Update(msg)
+	l.Paginator, cmd = l.Paginator.Update(msg)
 
-	if l.paginator.Page*l.paginator.PerPage >= len(l.items) {
-		l.paginator.Page = (len(l.items) - 1) / l.paginator.PerPage
+	if l.Paginator.Page*l.Paginator.PerPage >= len(l.Items) {
+		l.Paginator.Page = (len(l.Items) - 1) / l.Paginator.PerPage
 	}
 
-	start, end := l.paginator.GetSliceBounds(len(l.items))
-	if start >= len(l.items) {
+	start, end := l.Paginator.GetSliceBounds(len(l.Items))
+	if start >= len(l.Items) {
 		start = 0
-		l.paginator.Page = 0
+		l.Paginator.Page = 0
 	}
-	if end > len(l.items) {
-		end = len(l.items)
+	if end > len(l.Items) {
+		end = len(l.Items)
 	}
-	currentPageItems := l.items[start:end]
+	currentPageItems := l.Items[start:end]
 
 	if len(currentPageItems) == 0 {
-		l.cursor = 0
-	} else if l.cursor >= len(currentPageItems) {
-		l.cursor = len(currentPageItems) - 1
+		l.Cursor = 0
+	} else if l.Cursor >= len(currentPageItems) {
+		l.Cursor = len(currentPageItems) - 1
 	}
 
 	switch msg := msg.(type) {
@@ -160,28 +158,29 @@ func (l *Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		switch msg.Type {
 		case tea.KeyEnter:
 			if len(currentPageItems) > 0 {
-				if err := exec.Command("cmd", "/c", "start", currentPageItems[l.cursor]).Run(); err != nil {
-					log.Fatal(err)
+				includesTrailingSlash := strings.HasSuffix(l.Dir, "/") || strings.HasSuffix(l.Dir, "\\")
+				if err := exec.Command("cmd", "/c", "start", map[bool]string{true: l.Dir + currentPageItems[l.Cursor], false: l.Dir + "\\" + currentPageItems[l.Cursor]}[includesTrailingSlash]).Run(); err != nil {
+					log.Print(err)
 				}
 			}
 		}
 		switch {
 		case key.Matches(msg, listNavigation.Up):
-			if l.cursor > 0 {
-				l.cursor--
+			if l.Cursor > 0 {
+				l.Cursor--
 			} else {
-				if l.paginator.Page > 0 {
-					l.paginator.PrevPage()
-					start, end = l.paginator.GetSliceBounds(len(l.items))
-					l.cursor = len(l.items[start:end]) - 1
+				if l.Paginator.Page > 0 {
+					l.Paginator.PrevPage()
+					start, end = l.Paginator.GetSliceBounds(len(l.Items))
+					l.Cursor = len(l.Items[start:end]) - 1
 				}
 			}
 		case key.Matches(msg, listNavigation.Down):
-			if l.cursor < len(currentPageItems)-1 {
-				l.cursor++
-			} else if l.paginator.Page < l.paginator.TotalPages-1 {
-				l.paginator.NextPage()
-				l.cursor = 0
+			if l.Cursor < len(currentPageItems)-1 {
+				l.Cursor++
+			} else if l.Paginator.Page < l.Paginator.TotalPages-1 {
+				l.Paginator.NextPage()
+				l.Cursor = 0
 			}
 		}
 	}
@@ -190,19 +189,33 @@ func (l *Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 
 func (l *Model) View() string {
 	var b strings.Builder
-	b.WriteString(headerStyle.Render("Fuzzy finder with Go :)") + "\n\n")
-	start, end := l.paginator.GetSliceBounds(len(l.items))
-	if len(l.items[start:end]) > 0 {
-		for i, item := range l.items[start:end] {
+	b.WriteString(headerStyle.Render("Fuzzy finder with Go :)") + "\n")
+	b.WriteString(itemLengthStyle.Render(fmt.Sprintf("%d items", len(l.Items))) + "\n")
+	start, end := l.Paginator.GetSliceBounds(len(l.Items))
+	var liView strings.Builder
+	if len(l.Items[start:end]) > 0 {
+		for i, item := range l.Items[start:end] {
 			cursor := " "
-			if l.cursor == i {
+			displayItem := item
+			// searchItem := strings.ToLower(item)
+			// searchFilter := strings.ToLower(l.filter_value)
+			// lastIndex := 0
+
+			// for _, letter := range searchFilter {
+			// 	if idx := strings.Index(searchItem[lastIndex:], string(letter)); idx != -1 {
+			// 		actualIdx := lastIndex + idx
+			// 		displayItem = displayItem[:actualIdx] + searchFilterBg.Render(string(displayItem[actualIdx])) + displayItem[actualIdx+1:]
+			// 		lastIndex = actualIdx + 1
+			// 	}
+			// }
+
+			if l.Cursor == i {
 				cursor = cursorStyle.Render(">")
-				b.WriteString(fmt.Sprintf("%s %s\n", cursor, activeItemStyle.Render(item)))
-			} else {
-				b.WriteString(fmt.Sprintf("%s %s\n", cursor, itemStyle.Render(item)))
 			}
+			liView.WriteString(fmt.Sprintf("%s %s\n", cursor, displayItem))
 		}
-		b.WriteString("\n" + "  " + l.paginator.View())
+		b.WriteString(listContainerStyle.Render(liView.String()))
+		b.WriteString("\n" + "  " + l.Paginator.View())
 	} else {
 		b.WriteString(fmt.Sprintf("%s\n", "No results found!"))
 	}

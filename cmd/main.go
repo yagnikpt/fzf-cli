@@ -4,6 +4,7 @@ Copyright © 2024 Yagnik Patel <pyagnik409@gmail.com>
 package main
 
 import (
+	"flag"
 	"fmt"
 	"log"
 	"os"
@@ -26,21 +27,25 @@ var docStyle = lipgloss.NewStyle().Margin(1, 2)
 var modeLabelStyle = lipgloss.NewStyle().Bold(true).Margin(0, 1, 0, 0).Padding(0, 1).Foreground(lipgloss.Color("#18181b")).Background(lipgloss.Color("#5eead4"))
 
 type model struct {
-	textInput textinput.Model
-	list      ui_list.Model
-	err       errMsg
-	mode      string
+	textInput   textinput.Model
+	list        ui_list.Model
+	err         errMsg
+	mode        string
+	view_height int
+	view_width  int
+	dir         string
 }
 
 func main() {
-	f, err := tea.LogToFile("debug.log", "debug")
+	f, err := tea.LogToFile("C:\\Codes\\go\\fzf_cli\\debug.log", "debug")
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer f.Close()
 	m, err := initializeModel()
 	if err != nil {
-		fmt.Print(err.Error())
+		fmt.Print(err)
+		os.Exit(1)
 	}
 	p := tea.NewProgram(m, tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
@@ -56,8 +61,6 @@ func (m model) Init() tea.Cmd {
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 	var cmd tea.Cmd
-
-	// log.Printf("Received message type: %T", msg)
 
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
@@ -98,13 +101,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.textInput.Cursor.Blink = true
 		log.Println("Focus event received")
 
-		// case tea.WindowSizeMsg:
-		// 	h, v := docStyle.GetFrameSize()
-		// 	m.list.SetSize(msg.Width-h, msg.Height-v)
+	case tea.WindowSizeMsg:
+		m.view_height = msg.Height
+		m.view_width = msg.Width
+		m.list.SetListHeight(msg.Height - 12)
 	}
 
-	filteredValues := algo.FuzzyFind(m.textInput.Value(), m.list.GetConstItemValues())
-	m.list.SetItemValues(filteredValues)
+	m.list.FilterValue = m.textInput.Value()
+	filteredValues := algo.FuzzyFind(m.textInput.Value(), m.list.ConstItems)
+	m.list.Items = filteredValues
 	m.list.UpdatePagesCount(len(filteredValues))
 
 	m.textInput, cmd = m.textInput.Update(msg)
@@ -143,7 +148,11 @@ func initializeModel() (model, error) {
 	if err != nil {
 		return model{}, err
 	}
-	file_items, err := files.GetAllFiles(wd)
+
+	target_dir := flag.String("dir", wd, "directory to search in")
+	flag.Parse()
+
+	file_items, err := files.GetAllFiles(*target_dir)
 	if err != nil {
 		return model{}, err
 	}
@@ -153,7 +162,7 @@ func initializeModel() (model, error) {
 
 	m := model{
 		textInput: ti,
-		list:      ui_list.NewList(file_items, const_items),
+		list:      ui_list.NewList(file_items, const_items, *target_dir),
 		err:       nil,
 		mode:      "insert",
 	}
