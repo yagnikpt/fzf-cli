@@ -4,7 +4,6 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 	"sync"
 )
@@ -64,42 +63,39 @@ func traverseDir(dir string, fileChan chan<- string, errorChan chan<- error, wg 
 				log.Printf("Error getting relative path for %s: %v\n", fullPath, err)
 				continue
 			}
-			fileChan <- path
+			if path != "" {
+				fileChan <- fullPath
+			}
 		}
 	}
 }
 
-func GetAllFiles(root string) ([]string, error) {
-	var files []string
+func GetAllFiles(root string) <-chan string {
 	fileChan := make(chan string)
 	errorChan := make(chan error)
-	var wg sync.WaitGroup
-
-	if _, err := os.Stat(root); os.IsNotExist(err) {
-		return nil, err
-	}
 
 	go func() {
-		for file := range fileChan {
-			files = append(files, file)
+		var wg sync.WaitGroup
+
+		if _, err := os.Stat(root); os.IsNotExist(err) {
+			log.Printf("Error occurred while traversing: %v\n", err)
 		}
-	}()
 
-	go func() {
-		for err := range errorChan {
-			if err != nil {
-				log.Printf("Error occurred while traversing: %v\n", err)
+		go func() {
+			for err := range errorChan {
+				if err != nil {
+					log.Printf("Error occurred while traversing: %v\n", err)
+				}
 			}
-		}
+		}()
+
+		wg.Add(1)
+		go traverseDir(root, fileChan, errorChan, &wg, root)
+
+		wg.Wait()
+		close(fileChan)
+		close(errorChan)
 	}()
 
-	wg.Add(1)
-	go traverseDir(root, fileChan, errorChan, &wg, root)
-
-	wg.Wait()
-	close(fileChan)
-	close(errorChan)
-
-	sort.Strings(files)
-	return files, nil
+	return fileChan
 }

@@ -22,11 +22,13 @@ import (
 type (
 	errMsg error
 )
+type fileMsg string
 
 var docStyle = lipgloss.NewStyle().Margin(1, 2)
 var modeLabelStyle = lipgloss.NewStyle().Bold(true).Margin(0, 1, 0, 0).Padding(0, 1).Foreground(lipgloss.Color("#18181b")).Background(lipgloss.Color("#5eead4"))
 
 type model struct {
+	fileChan    <-chan string
 	textInput   textinput.Model
 	list        ui_list.Model
 	err         errMsg
@@ -54,8 +56,21 @@ func main() {
 	}
 }
 
+func waitForFile(ch <-chan string) tea.Cmd {
+	return func() tea.Msg {
+		file, ok := <-ch
+		if !ok {
+			return nil // Channel closed
+		}
+		return fileMsg(file)
+	}
+}
+
 func (m model) Init() tea.Cmd {
-	return textinput.Blink
+	return tea.Batch(
+		textinput.Blink,
+		waitForFile(m.fileChan),
+	)
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -63,6 +78,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
 	switch msg := msg.(type) {
+	case fileMsg:
+		m.list.ConstItems = append(m.list.Items, string(msg))
+		m.list.Items = append(m.list.Items, string(msg))
+		cmds = append(cmds, waitForFile(m.fileChan))
+		m.list.UpdatePagesCount(len(m.list.Items))
 	case tea.KeyMsg:
 		switch msg.Type {
 		case tea.KeyCtrlC:
@@ -152,19 +172,25 @@ func initializeModel() (model, error) {
 	target_dir := flag.String("dir", wd, "directory to search in")
 	flag.Parse()
 
-	file_items, err := files.GetAllFiles(*target_dir)
-	if err != nil {
-		return model{}, err
-	}
+	fileChan := files.GetAllFiles(*target_dir)
 
-	const_items := make([]string, len(file_items))
-	copy(const_items, file_items)
+	const_items := make([]string, 0)
+	for i := 0; i < 10; i++ {
+		if file, ok := <-fileChan; ok {
+			const_items = append(const_items, file)
+		} else {
+			break
+		}
+	}
+	file_items := make([]string, len(const_items))
+	copy(file_items, const_items)
 
 	m := model{
 		textInput: ti,
 		list:      ui_list.NewList(file_items, const_items, *target_dir),
 		err:       nil,
 		mode:      "insert",
+		fileChan:  fileChan,
 	}
 
 	return m, nil
