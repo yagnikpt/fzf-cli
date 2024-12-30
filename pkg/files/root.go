@@ -64,7 +64,7 @@ func traverseDir(dir string, fileChan chan<- string, errorChan chan<- error, wg 
 				continue
 			}
 			if path != "" {
-				fileChan <- fullPath
+				fileChan <- path
 			}
 		}
 	}
