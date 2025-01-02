@@ -20,12 +20,14 @@ type Model struct {
 	Mode        string
 	FilterValue string
 	Dir         string
+	maxItems    int
+	matchCache  map[string][]int
 }
 
 var headerStyle = lipgloss.NewStyle().Padding(0, 1).Bold(true).Italic(true).Foreground(lipgloss.Color("#FFFFFF")).Background(lipgloss.Color(("#4f46e5")))
 var itemLengthStyle = lipgloss.NewStyle().Margin(1, 0).Foreground(lipgloss.Color("#5e5e5e"))
 var cursorStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#f43f5e")).Bold(true)
-var searchFilterBg = lipgloss.NewStyle().Background(lipgloss.Color("#f43f5e"))
+var searchFilterHighlight = lipgloss.NewStyle().Foreground(lipgloss.Color("#f43f5e"))
 var listContainerStyle = lipgloss.NewStyle()
 
 func NewList(items []string, const_items []string, dir string) Model {
@@ -50,6 +52,8 @@ func NewList(items []string, const_items []string, dir string) Model {
 		Mode:        "insert",
 		FilterValue: "",
 		Dir:         dir,
+		matchCache:  make(map[string][]int),
+		maxItems:    1000,
 	}
 }
 
@@ -191,33 +195,89 @@ func (l *Model) View() string {
 	var b strings.Builder
 	b.WriteString(headerStyle.Render("Fuzzy finder with Go :)") + "\n")
 	b.WriteString(itemLengthStyle.Render(fmt.Sprintf("%d items", len(l.Items))) + "\n")
+
+	if len(l.Items) == 0 {
+		return b.String() + "\nNo items found"
+	}
+
 	start, end := l.Paginator.GetSliceBounds(len(l.Items))
+	if start >= len(l.Items) {
+		start = 0
+	}
+	if end > len(l.Items) {
+		end = len(l.Items)
+	}
+
 	var liView strings.Builder
-	if len(l.Items[start:end]) > 0 {
-		for i, item := range l.Items[start:end] {
-			cursor := " "
-			displayItem := item
-			// searchItem := strings.ToLower(item)
-			// searchFilter := strings.ToLower(l.filter_value)
-			// lastIndex := 0
+	displayItems := l.Items[start:end]
 
-			// for _, letter := range searchFilter {
-			// 	if idx := strings.Index(searchItem[lastIndex:], string(letter)); idx != -1 {
-			// 		actualIdx := lastIndex + idx
-			// 		displayItem = displayItem[:actualIdx] + searchFilterBg.Render(string(displayItem[actualIdx])) + displayItem[actualIdx+1:]
-			// 		lastIndex = actualIdx + 1
-			// 	}
-			// }
-
-			if l.Cursor == i {
-				cursor = cursorStyle.Render(">")
-			}
-			liView.WriteString(fmt.Sprintf("%s %s\n", cursor, displayItem))
+	for i, item := range displayItems {
+		cursor := " "
+		if l.Cursor == i {
+			cursor = cursorStyle.Render(">")
 		}
-		b.WriteString(listContainerStyle.Render(liView.String()))
-		b.WriteString("\n" + "  " + l.Paginator.View())
-	} else {
-		b.WriteString(fmt.Sprintf("%s\n", "No results found!"))
+
+		displayItem := l.highlightMatch(item)
+		liView.WriteString(fmt.Sprintf("%s %s\n", cursor, displayItem))
+	}
+
+	b.WriteString(listContainerStyle.Render(liView.String()))
+	if len(displayItems) > 0 {
+		b.WriteString("\n  " + l.Paginator.View())
 	}
 	return b.String()
+}
+
+func (l *Model) highlightMatch(item string) string {
+	if l.FilterValue == "" {
+		return item
+	}
+
+	searchItem := strings.ToLower(item)
+	searchFilter := strings.ToLower(l.FilterValue)
+
+	cacheKey := searchItem + "|" + searchFilter
+	if indices, ok := l.matchCache[cacheKey]; ok {
+		return l.applyHighlight(item, indices)
+	}
+
+	var matchIndices []int
+	lastIndex := 0
+
+	for _, letter := range searchFilter {
+		if idx := strings.Index(searchItem[lastIndex:], string(letter)); idx != -1 {
+			actualIdx := lastIndex + idx
+			matchIndices = append(matchIndices, actualIdx)
+			lastIndex = actualIdx + 1
+		} else {
+			return item
+		}
+	}
+
+	l.matchCache[cacheKey] = matchIndices
+	return l.applyHighlight(item, matchIndices)
+}
+
+func (l *Model) applyHighlight(item string, indices []int) string {
+	if len(indices) == 0 {
+		return item
+	}
+
+	var result strings.Builder
+	lastIdx := 0
+
+	for _, idx := range indices {
+		if idx >= len(item) {
+			continue
+		}
+		result.WriteString(item[lastIdx:idx])
+		result.WriteString(searchFilterHighlight.Render(string(item[idx])))
+		lastIdx = idx + 1
+	}
+
+	if lastIdx < len(item) {
+		result.WriteString(item[lastIdx:])
+	}
+
+	return result.String()
 }
