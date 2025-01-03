@@ -33,11 +33,11 @@ fzf-cli
 ```
 ### OR
 ```
-go run cmd/main.go
+go run main.go
 ```
 To build the application, use the following command:
 ```
-go build -o fzf.exe ./cmd/main.go
+go build
 ```
 Once the application is running, you can input your search queries, and the application will display the matching results based on the fuzzy search algorithm.
 
