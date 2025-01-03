@@ -1,7 +1,7 @@
 /*
 Copyright © 2024 Yagnik Patel <pyagnik409@gmail.com>
 */
-package main
+package cmd
 
 import (
 	"flag"
@@ -36,24 +36,6 @@ type model struct {
 	view_height int
 	view_width  int
 	dir         string
-}
-
-func main() {
-	f, err := tea.LogToFile("C:\\Codes\\go\\fzf_cli\\debug.log", "debug")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer f.Close()
-	m, err := initializeModel()
-	if err != nil {
-		fmt.Print(err)
-		os.Exit(1)
-	}
-	p := tea.NewProgram(m, tea.WithAltScreen())
-	if _, err := p.Run(); err != nil {
-		fmt.Printf("Alas, there's been an error: %v", err)
-		os.Exit(1)
-	}
 }
 
 func waitForFile(ch <-chan []string) tea.Cmd {
@@ -159,7 +141,7 @@ func (m model) View() string {
 	return docStyle.Render(b.String())
 }
 
-func initializeModel() (model, error) {
+func InitializeModel() (model, error) {
 	ti := textinput.New()
 	ti.Placeholder = "Search your stuff..."
 	ti.Focus()
