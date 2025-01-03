@@ -22,13 +22,13 @@ import (
 type (
 	errMsg error
 )
-type fileMsg string
+type fileMsg []string
 
 var docStyle = lipgloss.NewStyle().Margin(1, 2)
 var modeLabelStyle = lipgloss.NewStyle().Bold(true).Margin(0, 1, 0, 0).Padding(0, 1).Foreground(lipgloss.Color("#18181b")).Background(lipgloss.Color("#5eead4"))
 
 type model struct {
-	fileChan    <-chan string
+	fileChan    <-chan []string
 	textInput   textinput.Model
 	list        ui_list.Model
 	err         errMsg
@@ -56,7 +56,7 @@ func main() {
 	}
 }
 
-func waitForFile(ch <-chan string) tea.Cmd {
+func waitForFile(ch <-chan []string) tea.Cmd {
 	return func() tea.Msg {
 		file, ok := <-ch
 		if !ok {
@@ -79,8 +79,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case fileMsg:
-		m.list.ConstItems = append(m.list.Items, string(msg))
-		m.list.Items = append(m.list.Items, string(msg))
+		m.list.ConstItems = make([]string, len(msg))
+		m.list.Items = make([]string, len(msg))
+		copy(m.list.ConstItems, msg)
+		copy(m.list.Items, msg)
 		cmds = append(cmds, waitForFile(m.fileChan))
 		m.list.UpdatePagesCount(len(m.list.Items))
 	case tea.KeyMsg:
@@ -175,12 +177,8 @@ func initializeModel() (model, error) {
 	fileChan := files.GetAllFiles(*target_dir)
 
 	const_items := make([]string, 0)
-	for i := 0; i < 10; i++ {
-		if file, ok := <-fileChan; ok {
-			const_items = append(const_items, file)
-		} else {
-			break
-		}
+	if files, ok := <-fileChan; ok {
+		const_items = append(const_items, files...)
 	}
 	file_items := make([]string, len(const_items))
 	copy(file_items, const_items)

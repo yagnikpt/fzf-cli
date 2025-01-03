@@ -1,11 +1,13 @@
 package files
 
 import (
+	"io/fs"
 	"log"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
-	"sync"
+	"time"
 )
 
 var ignoredPaths = []string{
@@ -40,61 +42,86 @@ func shouldSkip(path string) bool {
 	return false
 }
 
-func traverseDir(dir string, fileChan chan<- string, errorChan chan<- error, wg *sync.WaitGroup, rootdir string) {
-	defer wg.Done()
+var (
+	maxWorkers = runtime.NumCPU() * 4
+)
 
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		log.Printf("Error reading directory %s: %v\n", dir, err)
-		errorChan <- err
-		return
+func GetAllFiles(root string) <-chan []string {
+	if _, err := os.Stat(root); os.IsNotExist(err) {
+		log.Fatalf("Error occurred while traversing: %v\n", err)
 	}
 
-	for _, entry := range entries {
-		fullPath := filepath.Join(dir, entry.Name())
-		if entry.IsDir() {
-			if !shouldSkip(entry.Name()) {
-				wg.Add(1)
-				go traverseDir(fullPath, fileChan, errorChan, wg, rootdir)
-			}
-		} else {
-			path, err := filepath.Rel(rootdir, fullPath)
-			if err != nil {
-				log.Printf("Error getting relative path for %s: %v\n", fullPath, err)
-				continue
-			}
-			if path != "" {
-				fileChan <- fullPath
-			}
-		}
-	}
-}
-
-func GetAllFiles(root string) <-chan string {
-	fileChan := make(chan string)
-	errorChan := make(chan error)
+	files := make([]string, 0, 1000)
+	done := make(chan struct{})
+	fileChan := make(chan []string)
+	errorChan := make(chan error, 10)
 
 	go func() {
-		var wg sync.WaitGroup
+		startTime := time.Now()
 
-		if _, err := os.Stat(root); os.IsNotExist(err) {
-			log.Printf("Error occurred while traversing: %v\n", err)
+		var fileCount int
+		err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+			if err != nil {
+				errorChan <- err
+				return nil
+			}
+
+			if d.IsDir() {
+				if shouldSkip(d.Name()) {
+					return filepath.SkipDir
+				}
+				return nil
+			}
+			relPath, _ := filepath.Rel(root, path)
+			files = append(files, relPath)
+			fileCount++
+			return nil
+		})
+
+		if err != nil {
+			log.Printf("Walk error: %v\n", err)
 		}
 
-		go func() {
-			for err := range errorChan {
-				if err != nil {
-					log.Printf("Error occurred while traversing: %v\n", err)
+		done <- struct{}{}
+		duration := time.Since(startTime)
+		log.Printf("Processed %d files in %v (%.2f files/sec)\n",
+			fileCount,
+			duration,
+			float64(fileCount)/duration.Seconds())
+		close(done)
+	}()
+
+	go func() {
+		sendTicker := time.NewTicker(5 * time.Millisecond)
+		defer sendTicker.Stop()
+
+		for {
+			select {
+			case <-done:
+				if len(files) > 0 {
+					fileChan <- files
+				}
+				close(fileChan)
+				close(errorChan)
+				return
+			case <-sendTicker.C:
+				if len(files) > 0 {
+					select {
+					case fileChan <- files:
+						log.Printf("Sent %d files\n", len(files))
+					default:
+					}
 				}
 			}
-		}()
+		}
+	}()
 
-		wg.Add(1)
-		go traverseDir(root, fileChan, errorChan, &wg, root)
-
-		wg.Wait()
-		close(fileChan)
-		close(errorChan)
+	go func() {
+		for err := range errorChan {
+			if err != nil {
+				log.Printf("Error occurred while traversing: %v\n", err)
+			}
+		}
 	}()
 
 	return fileChan
