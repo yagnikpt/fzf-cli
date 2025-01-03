@@ -1,4 +1,4 @@
-module github.com/yagnik-patel-47/fzf
+module github.com/yagnik-patel-47/fzf-cli
 
 go 1.23.4
 
