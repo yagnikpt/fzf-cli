@@ -57,12 +57,12 @@ func fuzzyMatch(needle, haystack string) int {
 
 			// Bonus for consecutive matches
 			if lastMatchIdx != -1 && i == lastMatchIdx+1 {
-				score += 2
+				score += 3
 			}
 
 			// Bonus for matching start of words
 			if i == 0 || haystack[i-1] == ' ' {
-				score += 3
+				score += 2
 			}
 
 			lastMatchIdx = i

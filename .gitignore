@@ -1,6 +1,6 @@
-fzf.exe
+my-fzf.exe
 debug.log
 /dummy_files
 /dummy_web
-fzf.exe~
+my-fzf.exe~
 .vscode

@@ -126,7 +126,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.view_height = msg.Height
 		m.view_width = msg.Width
-		m.list.SetListHeight(msg.Height - 12)
+		m.list.SetListHeight(msg.Height - 13)
 	}
 
 	m.list.FilterValue = m.textInput.Value()
