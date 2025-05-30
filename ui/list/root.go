@@ -2,8 +2,6 @@ package ui_list
 
 import (
 	"fmt"
-	"log"
-	"os/exec"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/key"
@@ -35,8 +33,8 @@ func NewList(items []string, const_items []string, dir string) Model {
 	p.Type = paginator.Dots
 	p.PerPage = 10
 	p.KeyMap = paginator.KeyMap{
-		PrevPage: key.NewBinding(key.WithKeys("pgup", "left", "a"), key.WithHelp("←", "page left")),
-		NextPage: key.NewBinding(key.WithKeys("pgdown", "right", "d"), key.WithHelp("→", "page right")),
+		PrevPage: key.NewBinding(key.WithKeys("pgup", "left", "h"), key.WithHelp("←", "page left")),
+		NextPage: key.NewBinding(key.WithKeys("pgdown", "right", "l"), key.WithHelp("→", "page right")),
 	}
 	p.ActiveDot = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "235", Dark: "252"}).Render("•")
 	p.InactiveDot = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "250", Dark: "238"}).Render("•")
@@ -85,6 +83,22 @@ func (l *Model) GetSlicedItems() []string {
 	return l.Items[start:end]
 }
 
+func (l *Model) GetItem() (string, error) {
+	start, end := l.Paginator.GetSliceBounds(len(l.Items))
+	if start >= len(l.Items) {
+		start = 0
+		l.Paginator.Page = 0
+	}
+	if end > len(l.Items) {
+		end = len(l.Items)
+	}
+	currentPageItems := l.Items[start:end]
+	if len(currentPageItems) > 0 {
+		return currentPageItems[l.Cursor], nil
+	}
+	return "", fmt.Errorf("no item found")
+}
+
 func (l *Model) SetMode(mode string) {
 	l.Mode = mode
 	if mode == "insert" {
@@ -109,20 +123,20 @@ type KeyMap struct {
 
 var listNavigation = KeyMap{
 	Up: key.NewBinding(
-		key.WithKeys("w", "up"),
-		key.WithHelp("↑/w", "move up"),
+		key.WithKeys("k", "up"),
+		key.WithHelp("↑/k", "move up"),
 	),
 	Down: key.NewBinding(
-		key.WithKeys("s", "down"),
-		key.WithHelp("↓/s", "move down"),
+		key.WithKeys("j", "down"),
+		key.WithHelp("↓/j", "move down"),
 	),
 	Left: key.NewBinding(
-		key.WithKeys("a", "left", "pgup"),
-		key.WithHelp("←/a/pgdn", "move left"),
+		key.WithKeys("h", "left", "pgup"),
+		key.WithHelp("←/h/pgdn", "move left"),
 	),
 	Right: key.NewBinding(
-		key.WithKeys("d", "right", "pgdn"),
-		key.WithHelp("→/d/pgup", "move right"),
+		key.WithKeys("l", "right", "pgdn"),
+		key.WithHelp("→/l/pgup", "move right"),
 	),
 }
 
@@ -159,15 +173,6 @@ func (l *Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		switch msg.Type {
-		case tea.KeyEnter:
-			if len(currentPageItems) > 0 {
-				includesTrailingSlash := strings.HasSuffix(l.Dir, "/") || strings.HasSuffix(l.Dir, "\\")
-				if err := exec.Command("cmd", "/c", "start", map[bool]string{true: l.Dir + currentPageItems[l.Cursor], false: l.Dir + "\\" + currentPageItems[l.Cursor]}[includesTrailingSlash]).Run(); err != nil {
-					log.Print(err)
-				}
-			}
-		}
 		switch {
 		case key.Matches(msg, listNavigation.Up):
 			if l.Cursor > 0 {
@@ -225,6 +230,7 @@ func (l *Model) View() string {
 	if len(displayItems) > 0 {
 		b.WriteString("\n  " + l.Paginator.View())
 	}
+
 	return b.String()
 }
 
