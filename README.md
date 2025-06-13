@@ -5,7 +5,6 @@
 
 ## Project Description
 This Go project implements a fuzzy searching algorithm and provides a user interface for interacting with the search functionality.
-Using concurrency for improved performance when loading files. By using a worker pool to scan directories concurrently and collecting results through channels, the application can handle large directories more efficiently and provide faster search results.
 
 ## Installation Instructions
 ### Install directly with go
