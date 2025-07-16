@@ -1,4 +1,4 @@
-package ui_list
+package list
 
 import (
 	"fmt"

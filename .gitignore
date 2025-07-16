@@ -1,6 +1,8 @@
-my-fzf.exe
+fzf-cli.exe
 debug.log
 /dummy_files
 /dummy_web
-my-fzf.exe~
+fzf-cli.exe~
 .vscode
+fzf-cli
+demo.tape

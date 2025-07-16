@@ -14,9 +14,9 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/yagnik-patel-47/fzf-cli/pkg/algo"
-	"github.com/yagnik-patel-47/fzf-cli/pkg/files"
-	ui_list "github.com/yagnik-patel-47/fzf-cli/ui/list"
+	"github.com/yagnikpt/fzf-cli/internal/algo"
+	"github.com/yagnikpt/fzf-cli/internal/components/list"
+	"github.com/yagnikpt/fzf-cli/internal/files"
 )
 
 type (
@@ -30,7 +30,7 @@ var modeLabelStyle = lipgloss.NewStyle().Bold(true).Margin(0, 1, 0, 0).Padding(0
 type Model struct {
 	fileChan    <-chan []string
 	textInput   textinput.Model
-	list        ui_list.Model
+	list        list.Model
 	err         errMsg
 	mode        string
 	view_height int
@@ -174,7 +174,7 @@ func InitializeModel() (Model, error) {
 
 	m := Model{
 		textInput: ti,
-		list:      ui_list.NewList(file_items, const_items, *target_dir),
+		list:      list.NewList(file_items, const_items, *target_dir),
 		err:       nil,
 		mode:      "insert",
 		fileChan:  fileChan,

@@ -8,7 +8,7 @@ import (
 	"runtime"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/yagnik-patel-47/fzf-cli/cmd"
+	"github.com/yagnikpt/fzf-cli/cmd"
 )
 
 func get_log_path() string {

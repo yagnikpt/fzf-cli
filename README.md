@@ -1,7 +1,7 @@
 # Go Fuzzy Finder
 
 ## Preview
-![Go Fuzzy Finder Demo](output.gif)
+![Go Fuzzy Finder Demo](demo.gif)
 
 ## Project Description
 This Go project implements a fuzzy searching algorithm and provides a user interface for interacting with the search functionality.
@@ -9,12 +9,12 @@ This Go project implements a fuzzy searching algorithm and provides a user inter
 ## Installation Instructions
 ### Install directly with go
 ```
-go install github.com/yagnik-patel-47/fzf-cli@latest
+go install github.com/yagnikpt/fzf-cli@latest
 ```
 ### Install by building locally
 1. Clone the repository:
 ```
-git clone https://github.com/yagnik-patel-47/fzf-cli.git
+git clone https://github.com/yagnikpt/fzf-cli.git
 ```
 2. Navigate to the project directory:
 ```

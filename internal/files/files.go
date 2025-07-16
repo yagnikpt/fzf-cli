@@ -5,7 +5,6 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"time"
 )
@@ -31,6 +30,7 @@ var ignoredPaths = []string{
 	".wrangler",
 	".svelte-kit",
 	".pnpm-store",
+	".venv",
 }
 
 func shouldSkip(path string) bool {
@@ -41,10 +41,6 @@ func shouldSkip(path string) bool {
 	}
 	return false
 }
-
-var (
-	maxWorkers = runtime.NumCPU() * 4
-)
 
 func GetAllFiles(root string) <-chan []string {
 	if _, err := os.Stat(root); os.IsNotExist(err) {
